@@ -5,6 +5,7 @@ from django.utils import timezone
 from .models import Todo
 from .serializers import TodoSerializer
 from django.http import HttpResponse
+from typing_extensions import override
 
 def hello_world(request):
      return HttpResponse("hello worlds")
@@ -13,9 +14,11 @@ class TodoViewSet(viewsets.ModelViewSet):
     queryset = Todo.objects.filter(is_deleted=False)
     serializer_class = TodoSerializer
 
+    @override
     def destroy(self):
         instance = self.get_object()
         instance.is_deleted = True
+        instance.deleted_at = timezone.now()
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
@@ -28,18 +31,38 @@ class TodoViewSet(viewsets.ModelViewSet):
         todo.save()
         return Response({'status': 'reminder set'}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['post'], url_path='move')
-    def move(self, request, pk=None):
+    @action(detail=True, methods=['post'], url_path='update-status')
+    def update_status(self, request, pk=None):
         todo = self.get_object()
-        if todo.status != Todo.COMPLETED:
-            todo.status += 1
-            if todo.status == Todo.IN_PROGRESS:
+        new_status = request.data.get('status')
+
+        if new_status is None:
+            return Response({'error': 'Status is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            new_status = int(new_status)
+        except ValueError:
+            return Response({'error': 'Status must be an integer.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_status not in [Todo.NOT_STARTED, Todo.IN_PROGRESS, Todo.COMPLETED]:
+            return Response({'error': 'Invalid status value.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_status == Todo.IN_PROGRESS:
+            todo.start_date = timezone.now()
+            todo.end_date = None
+        elif new_status == Todo.COMPLETED:
+            if todo.status == Todo.NOT_STARTED:
                 todo.start_date = timezone.now()
-            elif todo.status == Todo.COMPLETED:
+                todo.end_date = todo.start_date
+            else:
                 todo.end_date = timezone.now()
-            todo.save()
-            return Response({'status': 'task moved'}, status=status.HTTP_200_OK)
-        else:
-            return Response({'status': 'task already completed'}, status=status.HTTP_400_BAD_REQUEST)
+        elif new_status == Todo.NOT_STARTED:
+            todo.start_date = None
+            todo.end_date = None
+
+        todo.status = new_status
+        todo.save()
+
+        return Response({'status': 'Task status updated successfully.'}, status=status.HTTP_200_OK)
 
 

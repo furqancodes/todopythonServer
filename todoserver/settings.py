@@ -1,5 +1,7 @@
 from pathlib import Path
 from config.config import Config
+from celery.schedules import crontab
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -58,6 +60,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'todoserver.wsgi.application'
 
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
@@ -113,3 +116,12 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+
+CELERY_BEAT_SCHEDULE = {
+    'check-reminders-every-minute': {
+    'task': 'todoapp.celerytasks.checkreminder.check_reminders',
+    'schedule': crontab(minute='*/1')
+    },
+}
