@@ -15,7 +15,7 @@ class TodoViewSet(viewsets.ModelViewSet):
     serializer_class = TodoSerializer
 
     @override
-    def destroy(self):
+    def destroy(self, request, pk=None):
         instance = self.get_object()
         instance.is_deleted = True
         instance.deleted_at = timezone.now()
